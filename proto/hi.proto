@@ -1,3 +1,9 @@
+// hi daemon IPC service
+//
+// To regenerate Go stubs (requires buf CLI):
+//   go install github.com/bufbuild/buf/cmd/buf@latest
+//   buf generate
+//
 syntax = "proto3";
 
 package hi.v1;
