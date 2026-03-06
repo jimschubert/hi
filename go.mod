@@ -13,3 +13,5 @@ require (
 )
 
 require github.com/alecthomas/kong v1.14.0
+
+require github.com/sethvargo/go-envconfig v1.3.0 // indirect

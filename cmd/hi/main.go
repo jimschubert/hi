@@ -7,6 +7,8 @@ import (
 	"os"
 
 	"github.com/alecthomas/kong"
+	"github.com/jimschubert/hi/internal/config"
+	"github.com/sethvargo/go-envconfig"
 )
 
 var (
@@ -16,11 +18,13 @@ var (
 )
 
 var CLI struct {
+	Daemon  DaemonCmd        `cmd:"" help:"Run the hi daemon."`
 	Version kong.VersionFlag `short:"v" help:"Print version information."`
 }
 
 func main() {
 	logger := log.New(os.Stdout, "[hi] ", 0)
+
 	ctx := kong.Parse(&CLI,
 		kong.Name(programName),
 		kong.Description("Human Intelligence — MCP server for human-in-the-loop agent interactions"),
@@ -31,7 +35,10 @@ func main() {
 		kong.Vars{
 			"version": fmt.Sprintf("%s %s (commit: %s)", programName, version, commit),
 		},
-		kong.Bind(logger),
+		kong.Bind(
+			logger,
+			processConfig(),
+		),
 	)
 
 	if ctx.Command() == "" {
@@ -41,4 +48,14 @@ func main() {
 
 	err := ctx.Run(context.Background())
 	ctx.FatalIfErrorf(err)
+}
+
+func processConfig() config.Config {
+	c := config.Config{}
+	err := envconfig.Process(context.Background(), &c)
+	if err != nil {
+		fmt.Printf("error processing config: %s\n", err)
+		os.Exit(1)
+	}
+	return c
 }
