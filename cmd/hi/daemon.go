@@ -13,6 +13,9 @@ type DaemonCmd struct {
 
 func (c *DaemonCmd) Run(conf config.Config) error {
 	ctx := context.Background()
-	d := daemon.New(c.Addr, daemon.WithLogLevel(conf.DaemonLogLevel()))
+	d := daemon.New(c.Addr,
+		daemon.WithLogLevel(conf.DaemonLogLevel()),
+		daemon.WithConfig(conf),
+	)
 	return d.Start(ctx)
 }
