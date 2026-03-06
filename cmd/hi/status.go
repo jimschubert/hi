@@ -34,15 +34,17 @@ func (s StatusCmd) Run(conf config.Config) error {
 
 	msg := fmt.Sprintf(`
 		hi daemon: running
+			version : %s	
 			uptime  : %s
 			socket  : %s
 			pending : %d
 			address : %s
 		`,
+		status.GetVersion(),
 		time.Duration(status.UptimeSeconds)*time.Second,
 		conf.SocketPath(),
-		status.PendingRequests,
-		cmp.Or(status.McpAddress, "<undefined>"),
+		status.GetPendingRequests(),
+		cmp.Or(status.GetMcpAddress(), "<undefined>"),
 	)
 
 	fmt.Print(dedent.Dedent(msg))

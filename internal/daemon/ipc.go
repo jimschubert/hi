@@ -67,6 +67,7 @@ func (d *Daemon) GetStatus(ctx context.Context, request *v1.GetStatusRequest) (*
 		PendingRequests: 0,
 		McpAddress:      d.mcpAddr,
 		UptimeSeconds:   int64(time.Since(d.startedAt).Seconds()),
+		Version:         daemonVersion,
 	}, nil
 }
 
