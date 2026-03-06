@@ -9,15 +9,17 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	connectcors "connectrpc.com/cors"
 	"connectrpc.com/grpcreflect"
 	"connectrpc.com/validate"
 	v1 "github.com/jimschubert/hi/internal/proto/gen/hi/v1"
 	"github.com/jimschubert/hi/internal/proto/gen/hi/v1/v1connect"
+	"github.com/rs/cors"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )
 
-func (d *Daemon) serveIPC(ctx context.Context) interface{} {
+func (d *Daemon) serveIPC(ctx context.Context) any {
 	socketPath := d.config.SocketPath()
 
 	ln, err := net.Listen("unix", socketPath)
@@ -37,7 +39,7 @@ func (d *Daemon) serveIPC(ctx context.Context) interface{} {
 	mux.Handle(grpcreflect.NewHandlerV1(reflector))
 	mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
 
-	srv := &http.Server{Handler: h2c.NewHandler(mux, &http2.Server{})}
+	srv := &http.Server{Handler: h2c.NewHandler(withCORS(mux), &http2.Server{})}
 	srv.BaseContext = func(listener net.Listener) context.Context {
 		return ctx
 	}
@@ -60,8 +62,12 @@ func (d *Daemon) Ping(ctx context.Context, request *v1.PingRequest) (*v1.PingRes
 }
 
 func (d *Daemon) GetStatus(ctx context.Context, request *v1.GetStatusRequest) (*v1.GetStatusResponse, error) {
-	// TODO implement me
-	panic("implement me")
+	return &v1.GetStatusResponse{
+		Running:         true,
+		PendingRequests: 0,
+		McpAddress:      d.mcpAddr,
+		UptimeSeconds:   int64(time.Since(d.startedAt).Seconds()),
+	}, nil
 }
 
 func (d *Daemon) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (*v1.ShutdownResponse, error) {
@@ -72,4 +78,16 @@ func (d *Daemon) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (*v1
 func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestRequest) (*v1.SubmitRequestResponse, error) {
 	// TODO implement me
 	panic("implement me")
+}
+
+// withCORS adds CORS support to a Connect HTTP handler.
+func withCORS(h http.Handler) http.Handler {
+	// taken from https://connectrpc.com/docs/go/deployment#h2c
+	middleware := cors.New(cors.Options{
+		AllowedOrigins: []string{"example.com"},
+		AllowedMethods: connectcors.AllowedMethods(),
+		AllowedHeaders: connectcors.AllowedHeaders(),
+		ExposedHeaders: connectcors.ExposedHeaders(),
+	})
+	return middleware.Handler(h)
 }

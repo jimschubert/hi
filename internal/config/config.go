@@ -7,8 +7,13 @@ import (
 type Config struct {
 	LogLevel string `env:"LOG_LEVEL,default=warn"`
 	// HiLogging allows for scoped logging, e.g. daemon=warn; scopes will be 1:1 with tool subcommand names
-	HiLogging    map[string]string `env:"HI_LOGGING,separator=="`
-	HiSocketPath string            `env:"HI_SOCKET_PATH,default=/tmp/hi.sock"`
+	HiLogging          map[string]string `env:"HI_LOGGING,separator=="`
+	HiSocketPath       string            `env:"HI_SOCKET_PATH,default=/tmp/hi.sock"`
+	HiClientTimeoutSec int               `env:"HI_CLIENT_TIMEOUT_SEC,default=5"`
+}
+
+func (c Config) ClientTimeout() int {
+	return max(5, c.HiClientTimeoutSec)
 }
 
 func (c Config) SocketPath() string {

@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/sethvargo/go-envconfig"
@@ -159,6 +160,51 @@ func TestConfig_ScopedLevel(t *testing.T) {
 			c := processWithMap(t, tc.env)
 			if got := c.scopedLevel(tc.scope); got != tc.expected {
 				t.Errorf("scopedLevel(%q): got %q, want %q", tc.scope, got, tc.expected)
+			}
+		})
+	}
+}
+
+func TestConfig_ClientTimeout(t *testing.T) {
+	t.Parallel()
+
+	defaultValue := 5
+	defaultStr := fmt.Sprintf("%d", defaultValue)
+
+	tests := []struct {
+		name               string
+		hiClientTimeoutSec int
+		want               int
+	}{
+		{
+			name:               "negative value returns min of " + defaultStr,
+			hiClientTimeoutSec: -1,
+			want:               defaultValue,
+		},
+		{
+			name:               "zero value returns min of " + defaultStr,
+			hiClientTimeoutSec: 0,
+			want:               defaultValue,
+		},
+		{
+			name:               defaultStr + " returns " + defaultStr,
+			hiClientTimeoutSec: defaultValue,
+			want:               defaultValue,
+		},
+
+		{
+			name:               "value > default returns that value",
+			hiClientTimeoutSec: defaultValue + 1,
+			want:               defaultValue + 1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := Config{
+				HiClientTimeoutSec: tt.hiClientTimeoutSec,
+			}
+			if got := c.ClientTimeout(); got != tt.want {
+				t.Errorf("ClientTimeout() = %v, want %v", got, tt.want)
 			}
 		})
 	}
