@@ -1,0 +1,18 @@
+# See https://buf.build/docs/configuration/v2/buf-gen-yaml/
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package
+      value: github.com/jimschubert/hi/internal/proto/gen/hi/v1
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: gen
+    opt: paths=source_relative
+  - remote: buf.build/connectrpc/gosimple # see https://connectrpc.com/docs/go/getting-started
+    out: gen
+    opt:
+      - paths=source_relative
+      - simple
+inputs:
+  - directory: .

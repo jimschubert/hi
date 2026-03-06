@@ -6,6 +6,15 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/jimschubert/hi)](https://goreportcard.com/report/github.com/jimschubert/hi)
 [![GitHub Release](https://img.shields.io/github/v/release/jimschubert/hi)](https://github.com/jimschubert/hi/releases/latest)
 
+## Protobuf
+
+To generate protobuf code, run:
+
+```bash
+go install github.com/bufbuild/buf/cmd/buf@latest
+cd internal/proto
+buf generate
+```
 
 ## License
 

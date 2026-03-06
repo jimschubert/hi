@@ -8,36 +8,46 @@ syntax = "proto3";
 
 package hi.v1;
 
-option go_package = "github.com/jimschubert/hi/internal/proto/hiv1";
+option go_package = "github.com/jimschubert/hi/internal/proto/gen/hi/v1";
 
 service HiService {
   // Ping confirms the daemon is alive and returns its version.
-  rpc Ping(Empty) returns (PingResponse);
+  rpc Ping(PingRequest) returns (PingResponse);
 
   // GetStatus returns runtime state: uptime, queue depth, MCP address.
-  rpc GetStatus(Empty) returns (StatusResponse);
+  rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
 
   // Shutdown asks the daemon to exit gracefully.
-  rpc Shutdown(Empty) returns (Empty);
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
 
   // SubmitRequest forwards a human-input request from an MCP bridge process
   // to the daemon UI. Blocks until the user responds or the context is
   // cancelled. (Used by the hi-mcp-bridge mode, if adopted in a future version
   // where stdio MCP transport is preferred over HTTP.)
-  rpc SubmitRequest(SubmitRequestReq) returns (SubmitRequestResp);
+  rpc SubmitRequest(SubmitRequestRequest) returns (SubmitRequestResponse);
 }
 
-message Empty {}
+message PingRequest {}
 
-message PingResponse {
-  string version = 1;
+message GetStatusRequest {}
+
+message ShutdownRequest {}
+
+message SubmitRequestRequest {
+  string      agent_name   = 1;
+  RequestType type         = 2;
+  string      title        = 3;
+  string      prompt       = 4;
+  string      default_val  = 5;
+  repeated string choices  = 6;
+  bool        multi_select = 7;
 }
 
-message StatusResponse {
-  bool   running           = 1;
-  int32  pending_requests  = 2;
-  string mcp_address       = 3;
-  int64  uptime_seconds    = 4;
+message SubmitRequestResponse {
+  string          text_value    = 1;
+  bool            bool_value    = 2;
+  repeated string choice_values = 3;
+  bool            cancelled     = 4;
 }
 
 enum RequestType {
@@ -49,19 +59,15 @@ enum RequestType {
   REQUEST_TYPE_NOTIFY      = 5;
 }
 
-message SubmitRequestReq {
-  string      agent_name   = 1;
-  RequestType type         = 2;
-  string      title        = 3;
-  string      prompt       = 4;
-  string      default_val  = 5;
-  repeated string choices  = 6;
-  bool        multi_select = 7;
+message PingResponse {
+  string version = 1;
 }
 
-message SubmitRequestResp {
-  string          text_value    = 1;
-  bool            bool_value    = 2;
-  repeated string choice_values = 3;
-  bool            cancelled     = 4;
+message GetStatusResponse {
+  bool   running           = 1;
+  int32  pending_requests  = 2;
+  string mcp_address       = 3;
+  int64  uptime_seconds    = 4;
 }
+
+message ShutdownResponse {}
