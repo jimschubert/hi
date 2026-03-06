@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -41,32 +40,35 @@ func New(mcpAddr string, opts ...Option) *Daemon {
 	}
 
 	return &Daemon{
-		mcpAddr:       mcpAddr,
-		config:        options.config,
-		logger:        slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: options.logLevel})),
+		mcpAddr: mcpAddr,
+		config:  options.config,
+		logger: slog.New(slog.NewTextHandler(os.Stdout,
+			&slog.HandlerOptions{
+				Level: options.logLevel,
+			},
+		)),
 		shutdownHooks: make([]func(), 0),
 	}
 }
 
-func (d *Daemon) handleSignals() error {
+func (d *Daemon) handleSignals(ctx context.Context) error {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-
 	defer signal.Stop(sigChan)
 
 	for {
 		select {
 		case sig := <-sigChan:
-			fmt.Println()
-			d.logger.Info("Shutting down...", "signal", sig)
-
-			// Call shutdown hooks
-			for _, hook := range d.shutdownHooks {
-				hook()
-			}
-
+			d.logger.Warn("Signal received", "signal", sig)
 			if d.cancel != nil {
 				d.cancel()
+				continue
+			}
+
+		case <-ctx.Done():
+			d.logger.Debug("Shutting down...")
+			for _, hook := range d.shutdownHooks {
+				hook()
 			}
 
 			return nil
@@ -77,7 +79,6 @@ func (d *Daemon) handleSignals() error {
 func (d *Daemon) Start(ctx context.Context) error {
 	slog.Info("hi daemon started", "addr", d.mcpAddr)
 
-	// TODO: we'll need a cancel function
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancel = cancel
 	d.startedAt = time.Now()
@@ -94,11 +95,8 @@ func (d *Daemon) Start(ctx context.Context) error {
 		}
 	}()
 
-	go func() {
-		_ = d.handleSignals()
-	}()
-
-	<-ctx.Done()
+	// block until interrupt or ctx.Done(); calls shutdown hooks
+	_ = d.handleSignals(ctx)
 
 	slog.Info("hi daemon stopped", "uptime", time.Since(d.startedAt).String())
 	return nil

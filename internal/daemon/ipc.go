@@ -40,6 +40,7 @@ func (d *Daemon) serveIPC(ctx context.Context) interface{} {
 	srv := &http.Server{Handler: h2c.NewHandler(mux, &http2.Server{})}
 
 	d.shutdownHooks = append(d.shutdownHooks, func() {
+		d.logger.Debug("Shutting down IPC server")
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutCtx)

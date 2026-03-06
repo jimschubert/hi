@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"log/slog"
+	"strings"
 
 	"github.com/jimschubert/hi/internal/config"
 )
@@ -16,8 +17,8 @@ type Option func(*daemonOpts)
 func WithLogLevel(logLevel string) Option {
 	return func(opts *daemonOpts) {
 		var l slog.Level
-		if err := l.UnmarshalText([]byte(logLevel)); err != nil {
-			l = slog.LevelError
+		if err := l.UnmarshalText([]byte(strings.ToUpper(logLevel))); err != nil {
+			l = slog.LevelWarn
 		}
 		opts.logLevel = l
 	}

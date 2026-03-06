@@ -7,12 +7,15 @@ before:
     - sh -c 'cd internal/proto && buf generate'
 builds:
   - id: hi
-    main: cmd/hi/main.go
+    main: ./cmd/hi
     binary: hi
     env:
       - CGO_ENABLED=0
     ldflags:
-      - -s -w -X main.version={{ .Version }} -X main.commit={{ .ShortCommit }}
+      - -s -w
+      - -X main.version={{ .Version }}
+      - -X main.commit={{ .ShortCommit }}
+      - -X github.com/jimschubert/hi/internal/daemon.daemonVersion={{ .Version }}
     goos:
       - linux
       - darwin
