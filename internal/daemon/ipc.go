@@ -72,8 +72,8 @@ func (d *Daemon) GetStatus(ctx context.Context, request *v1.GetStatusRequest) (*
 }
 
 func (d *Daemon) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (*v1.ShutdownResponse, error) {
-	// TODO implement me
-	panic("implement me")
+	defer d.cancel()
+	return &v1.ShutdownResponse{}, nil
 }
 
 func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestRequest) (*v1.SubmitRequestResponse, error) {

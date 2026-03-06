@@ -57,3 +57,13 @@ func (c *Client) Status(ctx context.Context) (*v1.GetStatusResponse, error) {
 	}
 	return resp, nil
 }
+
+func (c *Client) Shutdown(ctx context.Context) (*v1.ShutdownResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	resp, err := c.rpc.Shutdown(ctx, &v1.ShutdownRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("error calling shutdown: %w", err)
+	}
+	return resp, nil
+}
