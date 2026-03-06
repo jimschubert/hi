@@ -11,3 +11,5 @@ require (
 	connectrpc.com/connect v1.19.1
 	google.golang.org/protobuf v1.36.11
 )
+
+require github.com/alecthomas/kong v1.14.0

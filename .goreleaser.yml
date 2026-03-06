@@ -7,7 +7,7 @@ before:
     - sh -c 'cd internal/proto && buf generate'
 builds:
   - id: hi
-    main: .
+    main: cmd/hi/main.go
     binary: hi
     env:
       - CGO_ENABLED=0
