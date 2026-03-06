@@ -20,11 +20,13 @@ var (
 var CLI struct {
 	Daemon  DaemonCmd        `cmd:"" help:"Run the hi daemon."`
 	Version kong.VersionFlag `short:"v" help:"Print version information."`
+	Default DefaultCmd       `hidden:"" cmd:"" default:"withargs" help:"Ensures the daemon is running, starting if it's not (default)."`
 }
 
 func main() {
 	logger := log.New(os.Stdout, "[hi] ", 0)
 
+	conf := processConfig()
 	ctx := kong.Parse(&CLI,
 		kong.Name(programName),
 		kong.Description("Human Intelligence — MCP server for human-in-the-loop agent interactions"),
@@ -37,14 +39,9 @@ func main() {
 		},
 		kong.Bind(
 			logger,
-			processConfig(),
+			conf,
 		),
 	)
-
-	if ctx.Command() == "" {
-		logger.Println("No command provided. Use --help for usage information.")
-		os.Exit(1)
-	}
 
 	err := ctx.Run(context.Background())
 	ctx.FatalIfErrorf(err)
