@@ -38,6 +38,16 @@ func NewClient(config config.Config) (*Client, error) {
 	}, nil
 }
 
+func (c *Client) Ping(ctx context.Context) (*v1.PingResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.timeout)
+	defer cancel()
+	resp, err := c.rpc.Ping(ctx, &v1.PingRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("error calling ping: %w", err)
+	}
+	return resp, nil
+}
+
 func (c *Client) Status(ctx context.Context) (*v1.GetStatusResponse, error) {
 	ctx, cancel := context.WithTimeout(ctx, c.timeout)
 	defer cancel()
