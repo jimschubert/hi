@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"cmp"
 	"context"
 	"log/slog"
 	"os"
@@ -77,7 +78,7 @@ func (d *Daemon) handleSignals(ctx context.Context) error {
 }
 
 func (d *Daemon) Start(ctx context.Context) error {
-	slog.Info("hi daemon started", "addr", d.mcpAddr)
+	slog.Info("hi daemon started", "addr", cmp.Or(d.mcpAddr, "<empty>"))
 
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancel = cancel

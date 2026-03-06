@@ -38,6 +38,9 @@ func (d *Daemon) serveIPC(ctx context.Context) interface{} {
 	mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
 
 	srv := &http.Server{Handler: h2c.NewHandler(mux, &http2.Server{})}
+	srv.BaseContext = func(listener net.Listener) context.Context {
+		return ctx
+	}
 
 	d.shutdownHooks = append(d.shutdownHooks, func() {
 		d.logger.Debug("Shutting down IPC server")
