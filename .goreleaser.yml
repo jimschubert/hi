@@ -1,10 +1,12 @@
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# single build: goreleaser build --clean --snapshot --id hi --single-target
 version: 2
 before:
   hooks:
     - sh -c 'which buf > /dev/null 2>&1 || go install github.com/bufbuild/buf/cmd/buf@latest'
     - go mod download
     - sh -c 'cd internal/proto && buf generate'
+    - go fix ./...
 builds:
   - id: hi
     main: ./cmd/hi
