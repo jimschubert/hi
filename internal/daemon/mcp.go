@@ -139,4 +139,17 @@ func registerTools(server *mcp.Server, backend RequestBackend) {
 			}, nil
 		},
 	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name: "hi_notify",
+			Description: "Send a non-blocking informational notification to the developer. " +
+				"Does not wait for a response. Use for status updates.",
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in NotifyInput) (*mcp.CallToolResult, NotifyOutput, error) {
+			agentName := cmp.Or(in.AgentName, "Agent")
+			err := backend.SubmitNotify(ctx, agentName, in.Title, in.Message)
+			return nil, NotifyOutput{Sent: err == nil}, nil
+		},
+	)
 }

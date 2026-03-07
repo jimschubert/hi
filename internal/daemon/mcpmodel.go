@@ -48,3 +48,13 @@ type ConfirmOutput struct {
 	Confirmed bool `json:"confirmed" jsonschema:"description=True if the user confirmed"`
 	Cancelled bool `json:"cancelled" jsonschema:"description=True if the user dismissed the dialog without responding"`
 }
+
+type NotifyInput struct {
+	AgentName string `json:"agent_name,omitempty" jsonschema:"description=The name of the calling agent (optional)"`
+	Title     string `json:"title" jsonschema:"description=Short title for the prompt dialog"`
+	Message   string `json:"message" jsonschema:"description=The full notification message to show the user"`
+}
+
+type NotifyOutput struct {
+	Sent bool `json:"sent" jsonschema:"description=True if the notification was successfully delivered"`
+}
