@@ -82,4 +82,23 @@ func registerTools(server *mcp.Server, backend RequestBackend) {
 		},
 	)
 
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name: "hi_multiline",
+			Description: "Ask the human developer for a multi-line text response, " +
+				"such as a description, code snippet, or detailed feedback.",
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in MultilineInput) (*mcp.CallToolResult, MultilineOutput, error) {
+			agentName := cmp.Or(in.AgentName, "Agent")
+			value, lines, cancelled, err := backend.SubmitMultiline(ctx, agentName, in.Title, in.Prompt, in.DefaultValue)
+			if err != nil {
+				return nil, MultilineOutput{Cancelled: true}, nil
+			}
+			return nil, MultilineOutput{
+				Value:     value,
+				LineCount: lines,
+				Cancelled: cancelled,
+			}, nil
+		},
+	)
 }

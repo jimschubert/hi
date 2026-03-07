@@ -11,3 +11,16 @@ type AskOutput struct {
 	Value     string `json:"value"`
 	Cancelled bool   `json:"cancelled"`
 }
+
+type MultilineInput struct {
+	AgentName    string `json:"agent_name,omitempty"`
+	Title        string `json:"title"`
+	Prompt       string `json:"prompt"`
+	DefaultValue string `json:"default_value,omitempty"`
+}
+
+type MultilineOutput struct {
+	Value     string `json:"value"`
+	LineCount int    `json:"line_count"`
+	Cancelled bool   `json:"cancelled"`
+}
