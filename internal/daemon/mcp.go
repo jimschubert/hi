@@ -120,4 +120,23 @@ func registerTools(server *mcp.Server, backend RequestBackend) {
 			}, nil
 		},
 	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name: "hi_confirm",
+			Description: "Ask the human developer to confirm or deny an action before " +
+				"the agent proceeds. Use before irreversible or sensitive operations.",
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in ConfirmInput) (*mcp.CallToolResult, ConfirmOutput, error) {
+			agentName := cmp.Or(in.AgentName, "Agent")
+			confirmed, cancelled, err := backend.SubmitConfirm(ctx, agentName, in.Title, in.Message)
+			if err != nil {
+				return nil, ConfirmOutput{Cancelled: true}, nil
+			}
+			return nil, ConfirmOutput{
+				Confirmed: confirmed,
+				Cancelled: cancelled,
+			}, nil
+		},
+	)
 }
