@@ -8,8 +8,9 @@ import (
 )
 
 type daemonOpts struct {
-	logLevel slog.Level
-	config   config.Config
+	logLevel  slog.Level
+	config    config.Config
+	enableIPC bool
 }
 
 type Option func(*daemonOpts)
@@ -27,5 +28,11 @@ func WithLogLevel(logLevel string) Option {
 func WithConfig(config config.Config) Option {
 	return func(opts *daemonOpts) {
 		opts.config = config
+	}
+}
+
+func WithIPCEnabled(enabled bool) Option {
+	return func(opts *daemonOpts) {
+		opts.enableIPC = enabled
 	}
 }

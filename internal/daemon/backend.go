@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strings"
+
+	v1 "github.com/jimschubert/hi/internal/proto/gen/hi/v1"
 )
 
 type RequestBackend interface {
@@ -82,4 +84,83 @@ func (r RandomResponseBackend) SubmitConfirm(ctx context.Context, agentName, tit
 func (r RandomResponseBackend) SubmitNotify(ctx context.Context, agentName, title, message string) error {
 	// notifications are fire-and-forget; nothing to randomise
 	return nil
+}
+
+type IPCClient interface {
+	SubmitRequest(ctx context.Context, req *v1.SubmitRequestRequest) (*v1.SubmitRequestResponse, error)
+}
+
+type IPCBackend struct {
+	client IPCClient
+}
+
+func NewIPCBackend(client IPCClient) RequestBackend {
+	return &IPCBackend{client: client}
+}
+
+func (b *IPCBackend) SubmitText(ctx context.Context, agentName, title, prompt, defaultVal string) (string, bool, error) {
+	resp, err := b.client.SubmitRequest(ctx, &v1.SubmitRequestRequest{
+		AgentName:  agentName,
+		Type:       v1.RequestType_REQUEST_TYPE_TEXT,
+		Title:      title,
+		Prompt:     prompt,
+		DefaultVal: defaultVal,
+	})
+	if err != nil {
+		return "", true, err
+	}
+	return resp.TextValue, resp.Cancelled, nil
+}
+
+func (b *IPCBackend) SubmitMultiline(ctx context.Context, agentName, title, prompt, defaultVal string) (string, int, bool, error) {
+	resp, err := b.client.SubmitRequest(ctx, &v1.SubmitRequestRequest{
+		AgentName:  agentName,
+		Type:       v1.RequestType_REQUEST_TYPE_MULTILINE,
+		Title:      title,
+		Prompt:     prompt,
+		DefaultVal: defaultVal,
+	})
+	if err != nil {
+		return "", 0, true, err
+	}
+	lines := strings.Count(resp.TextValue, "\n") + 1
+	return resp.TextValue, lines, resp.Cancelled, nil
+}
+
+func (b *IPCBackend) SubmitChoice(ctx context.Context, agentName, title, prompt string, choices []string, multiSelect bool) ([]string, bool, error) {
+	resp, err := b.client.SubmitRequest(ctx, &v1.SubmitRequestRequest{
+		AgentName:   agentName,
+		Type:        v1.RequestType_REQUEST_TYPE_CHOICE,
+		Title:       title,
+		Prompt:      prompt,
+		Choices:     choices,
+		MultiSelect: multiSelect,
+	})
+	if err != nil {
+		return nil, true, err
+	}
+	return resp.ChoiceValues, resp.Cancelled, nil
+}
+
+func (b *IPCBackend) SubmitConfirm(ctx context.Context, agentName, title, message string) (bool, bool, error) {
+	resp, err := b.client.SubmitRequest(ctx, &v1.SubmitRequestRequest{
+		AgentName: agentName,
+		Type:      v1.RequestType_REQUEST_TYPE_CONFIRM,
+		Title:     title,
+		Prompt:    message,
+	})
+	if err != nil {
+		return false, true, err
+	}
+	return resp.BoolValue, resp.Cancelled, nil
+}
+
+func (b *IPCBackend) SubmitNotify(ctx context.Context, agentName, title, message string) error {
+	_, err := b.client.SubmitRequest(ctx, &v1.SubmitRequestRequest{
+		AgentName: agentName,
+		Type:      v1.RequestType_REQUEST_TYPE_NOTIFY,
+		Title:     title,
+		Prompt:    message,
+	})
+	return err
 }

@@ -3,6 +3,7 @@ package daemon
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -19,6 +20,9 @@ var (
 type Daemon struct {
 	// mcpAddr is the address the MCP server is listening on.
 	mcpAddr string
+
+	// enableIPC determines whether to enable IPC over unix socket
+	enableIPC bool
 
 	// cancel stops all goroutines cleanly.
 	cancel context.CancelFunc
@@ -41,8 +45,9 @@ func New(mcpAddr string, opts ...Option) *Daemon {
 	}
 
 	return &Daemon{
-		mcpAddr: mcpAddr,
-		config:  options.config,
+		mcpAddr:   mcpAddr,
+		config:    options.config,
+		enableIPC: options.enableIPC,
 		logger: slog.New(slog.NewTextHandler(os.Stdout,
 			&slog.HandlerOptions{
 				Level: options.logLevel,
@@ -78,7 +83,11 @@ func (d *Daemon) handleSignals(ctx context.Context) error {
 }
 
 func (d *Daemon) Start(ctx context.Context) error {
-	slog.Info("hi daemon started", "addr", cmp.Or(d.mcpAddr, "<empty>"))
+	if err := d.validate(); err != nil {
+		return err
+	}
+
+	d.logger.Info("hi daemon started", "addr", cmp.Or(d.mcpAddr, "<empty>"))
 
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancel = cancel
@@ -88,20 +97,24 @@ func (d *Daemon) Start(ctx context.Context) error {
 	socketPath := d.config.SocketPath()
 	_ = os.Remove(socketPath)
 
-	err := d.serveMCP(ctx)
-	if err != nil {
+	if err := d.serveMCP(ctx); err != nil {
 		return err
 	}
 
-	go func() {
-		if err := d.serveIPC(ctx); err != nil {
-			slog.Error("IPC server error", "err", err)
-		}
-	}()
+	if err := d.serveIPC(ctx); err != nil {
+		return err
+	}
 
 	// block until interrupt or ctx.Done(); calls shutdown hooks
 	_ = d.handleSignals(ctx)
 
 	d.logger.Info("hi daemon stopped", "uptime", time.Since(d.startedAt).String())
+	return nil
+}
+
+func (d *Daemon) validate() error {
+	if d.mcpAddr == "" && !d.enableIPC {
+		return fmt.Errorf("at least one of MCP or IPC must be enabled")
+	}
 	return nil
 }

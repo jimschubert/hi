@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -18,7 +19,11 @@ import (
 	"golang.org/x/net/http2/h2c"
 )
 
-func (d *Daemon) serveIPC(ctx context.Context) any {
+func (d *Daemon) serveIPC(ctx context.Context) error {
+	if !d.enableIPC {
+		return nil
+	}
+
 	socketPath := d.config.SocketPath()
 
 	ln, err := net.Listen("unix", socketPath)
@@ -43,6 +48,13 @@ func (d *Daemon) serveIPC(ctx context.Context) any {
 		return ctx
 	}
 
+	go func() {
+		if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// NOTE: if *this* fails, we want to keep going to serve MCP
+			d.logger.Error("IPC server error", "err", err)
+		}
+	}()
+
 	d.shutdownHooks = append(d.shutdownHooks, func() {
 		d.logger.Debug("Shutting down IPC server")
 		shutCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -50,9 +62,6 @@ func (d *Daemon) serveIPC(ctx context.Context) any {
 		_ = srv.Shutdown(shutCtx)
 	})
 
-	if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return err
-	}
 	return nil
 }
 
@@ -93,6 +102,7 @@ func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestReq
 			d.logger.Warn("failed: SubmitConfirm", "err", err)
 			return nil, errors.New("submission failed")
 		}
+		d.logger.Debug("SubmitConfirm result", "val", confirm)
 		resp.BoolValue = confirm
 		resp.Cancelled = cancel
 	case v1.RequestType_REQUEST_TYPE_TEXT:
@@ -101,6 +111,7 @@ func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestReq
 			d.logger.Warn("failed: SubmitText", "err", err)
 			return nil, errors.New("submission failed")
 		}
+		d.logger.Debug("SubmitText result", "text", truncateText(val, 15))
 		resp.Cancelled = cancel
 		resp.TextValue = val
 	case v1.RequestType_REQUEST_TYPE_MULTILINE:
@@ -118,6 +129,7 @@ func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestReq
 			d.logger.Warn("failed: SubmitChoice", "err", err)
 			return nil, errors.New("submission failed")
 		}
+		d.logger.Debug("SubmitChoice result", "values", selected)
 		resp.Cancelled = cancel
 		resp.ChoiceValues = selected
 	case v1.RequestType_REQUEST_TYPE_UNSPECIFIED:
@@ -140,4 +152,18 @@ func withCORS(h http.Handler) http.Handler {
 		ExposedHeaders: connectcors.ExposedHeaders(),
 	})
 	return middleware.Handler(h)
+}
+
+// Taken from https://stackoverflow.com/a/59955447
+// Adrian (https://stackoverflow.com/users/7426/adrian)
+// License: CC BY-SA 4.0
+func truncateText(s string, max int) string {
+	if max > len(s) {
+		return s
+	}
+	result := s[:strings.LastIndexAny(s[:max], " .,:;-")]
+	if len(result) != len(s) {
+		result += "..."
+	}
+	return result
 }

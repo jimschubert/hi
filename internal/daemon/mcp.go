@@ -14,58 +14,61 @@ import (
 )
 
 func (d *Daemon) serveMCP(_ context.Context) error {
-	if d.mcpAddr != "" {
-		mcpServer := mcp.NewServer(&mcp.Implementation{
-			Name:    "hi",
-			Version: daemonVersion,
-		}, &mcp.ServerOptions{Logger: d.logger})
+	if d.mcpAddr == "" {
+		return nil
+	}
 
-		registerTools(mcpServer, RandomResponseBackend{})
+	mcpServer := mcp.NewServer(&mcp.Implementation{
+		Name:    "hi",
+		Version: daemonVersion,
+	}, &mcp.ServerOptions{Logger: d.logger})
 
-		mux := http.NewServeMux()
+	registerTools(mcpServer, RandomResponseBackend{})
 
-		mux.Handle("/mcp", mcp.NewStreamableHTTPHandler(
-			func(_ *http.Request) *mcp.Server { return mcpServer },
-			&mcp.StreamableHTTPOptions{Logger: d.logger},
-		))
+	mux := http.NewServeMux()
 
-		mux.HandleFunc("/api/status", func(writer http.ResponseWriter, request *http.Request) {
-			// taken from https://mcp-go.dev/transports/http/
-			writer.WriteHeader(http.StatusOK)
-			status := map[string]interface{}{
-				"status":    "healthy",
-				"timestamp": time.Now().Unix(),
-				"version":   daemonVersion,
-				"uptime":    time.Since(d.startedAt).String(),
-			}
+	mux.Handle("/mcp", mcp.NewStreamableHTTPHandler(
+		func(_ *http.Request) *mcp.Server { return mcpServer },
+		&mcp.StreamableHTTPOptions{Logger: d.logger},
+	))
 
-			writer.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(writer).Encode(status)
-		})
-
-		// listen _first_ so we don't fail in goroutine
-		ln, err := net.Listen("tcp", d.mcpAddr)
-		if err != nil {
-			d.logger.Warn("hi: couldn't MCP address, not starting remaining services.", "addr", d.mcpAddr, "error", err)
-			return fmt.Errorf("cannot bind MCP address: %s %w", d.mcpAddr, err)
+	mux.HandleFunc("/api/status", func(writer http.ResponseWriter, request *http.Request) {
+		// taken from https://mcp-go.dev/transports/http/
+		writer.WriteHeader(http.StatusOK)
+		status := map[string]any{
+			"status":    "healthy",
+			"timestamp": time.Now().Unix(),
+			"version":   daemonVersion,
+			"uptime":    time.Since(d.startedAt).String(),
 		}
 
-		mcpHttpServer := &http.Server{Handler: mux}
+		writer.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(writer).Encode(status)
+	})
 
-		go func() {
-			d.logger.Info("MCP server listening", "addr", d.mcpAddr, "path", "/mcp")
-			if err := mcpHttpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				// NOTE: if *this* fails, we want to keep going to serve IPC
-				d.logger.Error("MCP HTTP server error", "err", err)
-			}
-		}()
-
-		d.shutdownHooks = append(d.shutdownHooks, func() {
-			shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer shutCancel()
-			_ = mcpHttpServer.Shutdown(shutCtx)
-		})
+	// listen _first_ so we don't fail in goroutine
+	ln, err := net.Listen("tcp", d.mcpAddr)
+	if err != nil {
+		d.logger.Warn("hi: couldn't MCP address, not starting remaining services.", "addr", d.mcpAddr, "error", err)
+		return fmt.Errorf("cannot bind MCP address: %s %w", d.mcpAddr, err)
 	}
+
+	mcpHttpServer := &http.Server{Handler: mux}
+
+	go func() {
+		d.logger.Info("MCP server listening", "addr", d.mcpAddr, "path", "/mcp")
+		if err := mcpHttpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			// NOTE: if *this* fails, we want to keep going to serve IPC
+			d.logger.Error("MCP HTTP server error", "err", err)
+		}
+	}()
+
+	d.shutdownHooks = append(d.shutdownHooks, func() {
+		shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shutCancel()
+		_ = mcpHttpServer.Shutdown(shutCtx)
+	})
+
 	return nil
 }
 
