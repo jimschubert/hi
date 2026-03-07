@@ -101,4 +101,23 @@ func registerTools(server *mcp.Server, backend RequestBackend) {
 			}, nil
 		},
 	)
+
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name: "hi_choose",
+			Description: "Present a list of choices to the human developer and return " +
+				"their selection(s). Use for branching decisions.",
+		},
+		func(ctx context.Context, _ *mcp.CallToolRequest, in ChooseInput) (*mcp.CallToolResult, ChooseOutput, error) {
+			agentName := cmp.Or(in.AgentName, "Agent")
+			selected, cancelled, err := backend.SubmitChoice(ctx, agentName, in.Title, in.Prompt, in.Choices, in.MultiSelect)
+			if err != nil {
+				return nil, ChooseOutput{Cancelled: true}, nil
+			}
+			return nil, ChooseOutput{
+				Selected:  selected,
+				Cancelled: cancelled,
+			}, nil
+		},
+	)
 }

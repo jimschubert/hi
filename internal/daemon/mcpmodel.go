@@ -24,3 +24,16 @@ type MultilineOutput struct {
 	LineCount int    `json:"line_count"`
 	Cancelled bool   `json:"cancelled"`
 }
+
+type ChooseInput struct {
+	AgentName   string   `json:"agent_name,omitempty"`
+	Title       string   `json:"title"`
+	Prompt      string   `json:"prompt"`
+	Choices     []string `json:"choices" jsonschema:"List of options to present"`
+	MultiSelect bool     `json:"multi_select,omitempty" jsonschema:"Allow selecting more than one option"`
+}
+
+type ChooseOutput struct {
+	Selected  []string `json:"selected"`
+	Cancelled bool     `json:"cancelled"`
+}
