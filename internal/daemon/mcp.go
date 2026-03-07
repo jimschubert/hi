@@ -3,23 +3,69 @@ package daemon
 import (
 	"cmp"
 	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-type AskInput struct {
-	AgentName    string `json:"agent_name,omitempty" jsonschema:"The name of the calling agent (optional)"`
-	Title        string `json:"title" jsonschema:"Short title for the prompt dialog"`
-	Prompt       string `json:"prompt" jsonschema:"The question or instruction shown to the user"`
-	DefaultValue string `json:"default_value,omitempty" jsonschema:"Optional pre-filled text"`
+func (d *Daemon) serveMCP(_ context.Context) error {
+	if d.mcpAddr != "" {
+		mcpServer := mcp.NewServer(&mcp.Implementation{
+			Name:    "hi",
+			Version: daemonVersion,
+		}, &mcp.ServerOptions{Logger: d.logger})
+
+		registerTools(mcpServer, RandomResponseBackend{})
+
+		handler := mcp.NewStreamableHTTPHandler(
+			func(_ *http.Request) *mcp.Server { return mcpServer },
+			&mcp.StreamableHTTPOptions{Logger: d.logger},
+		)
+
+		mcpHttpServer := &http.Server{
+			Addr: d.mcpAddr,
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/mcp", "/mcp/":
+					handler.ServeHTTP(w, r)
+				case "/health":
+					w.WriteHeader(http.StatusOK)
+					fmt.Println(w, `{"ok":true}`)
+				default:
+					http.NotFound(w, r)
+				}
+			}),
+		}
+
+		// listen _first_ so we don't fail in goroutine
+		ln, err := net.Listen("tcp", d.mcpAddr)
+		if err != nil {
+			d.logger.Warn("hi: couldn't MCP address, not starting remaining services.", "addr", d.mcpAddr, "error", err)
+			return fmt.Errorf("cannot bind MCP address: %s %w", d.mcpAddr, err)
+		}
+
+		go func() {
+			d.logger.Info("MCP server listening", "addr", d.mcpAddr, "path", "/mcp")
+			if err := mcpHttpServer.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				// NOTE: if *this* fails, we want to keep going to serve IPC
+				d.logger.Error("MCP HTTP server error", "err", err)
+			}
+		}()
+
+		d.shutdownHooks = append(d.shutdownHooks, func() {
+			shutCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer shutCancel()
+			_ = mcpHttpServer.Shutdown(shutCtx)
+		})
+	}
+	return nil
 }
 
-type AskOutput struct {
-	Value     string `json:"value"`
-	Cancelled bool   `json:"cancelled"`
-}
-
-func RegisterTools(server *mcp.Server, backend RequestBackend) {
+func registerTools(server *mcp.Server, backend RequestBackend) {
 	mcp.AddTool(server,
 		&mcp.Tool{
 			Name: "hi_ask",

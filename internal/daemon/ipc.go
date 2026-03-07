@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"net"
 	"net/http"
 	"time"
@@ -27,7 +26,7 @@ func (d *Daemon) serveIPC(ctx context.Context) any {
 		return err
 	}
 
-	slog.Info("IPC listening", "socket", socketPath)
+	d.logger.Info("IPC listening", "socket", socketPath)
 
 	// see https://connectrpc.com/docs/go/getting-started
 	mux := http.NewServeMux()
