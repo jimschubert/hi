@@ -21,6 +21,7 @@ var CLI struct {
 	Daemon   DaemonCmd        `cmd:"" help:"Run the hi daemon."`
 	Status   StatusCmd        `cmd:"" help:"Query status of the hi daemon"`
 	Ping     PingCmd          `cmd:"" help:"Ping the hi daemon"`
+	Test     TestCmd          `cmd:"" help:"Submit 1+ test requests to the hi daemon"`
 	Shutdown ShutdownCmd      `cmd:"" help:"Shutdown the hi daemon (gracefully)"`
 	Version  kong.VersionFlag `short:"v" help:"Print version information."`
 	Default  DefaultCmd       `hidden:"" cmd:"" default:"withargs" help:"Ensures the daemon is running, starting if it's not (default)."`

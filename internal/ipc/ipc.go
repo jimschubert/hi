@@ -67,3 +67,13 @@ func (c *Client) Shutdown(ctx context.Context) (*v1.ShutdownResponse, error) {
 	}
 	return resp, nil
 }
+
+func (c *Client) SubmitRequest(ctx context.Context, req *v1.SubmitRequestRequest) (*v1.SubmitRequestResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	resp, err := c.rpc.SubmitRequest(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("error calling submit_request: %w", err)
+	}
+	return resp, nil
+}

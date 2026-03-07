@@ -77,8 +77,58 @@ func (d *Daemon) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (*v1
 }
 
 func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestRequest) (*v1.SubmitRequestResponse, error) {
-	// TODO implement me
-	panic("implement me")
+	// TODO: Implement values. need to enqueue, respond, then return values here.
+	backend := RandomResponseBackend{}
+
+	resp := &v1.SubmitRequestResponse{
+		TextValue:    "",
+		BoolValue:    false,
+		ChoiceValues: []string{},
+		Cancelled:    false,
+	}
+
+	switch request.Type {
+	case v1.RequestType_REQUEST_TYPE_CONFIRM:
+		confirm, cancel, err := backend.SubmitConfirm(ctx, request.AgentName, request.Title, request.Prompt)
+		if err != nil {
+			d.logger.Warn("failed: SubmitConfirm", "err", err)
+			return nil, errors.New("submission failed")
+		}
+		resp.BoolValue = confirm
+		resp.Cancelled = cancel
+	case v1.RequestType_REQUEST_TYPE_TEXT:
+		val, cancel, err := backend.SubmitText(ctx, request.AgentName, request.Title, request.Prompt, request.DefaultVal)
+		if err != nil {
+			d.logger.Warn("failed: SubmitText", "err", err)
+			return nil, errors.New("submission failed")
+		}
+		resp.Cancelled = cancel
+		resp.TextValue = val
+	case v1.RequestType_REQUEST_TYPE_MULTILINE:
+		val, lines, cancel, err := backend.SubmitMultiline(ctx, request.AgentName, request.Title, request.Prompt, request.DefaultVal)
+		if err != nil {
+			d.logger.Warn("failed: SubmitMultiline", "err", err)
+			return nil, errors.New("submission failed")
+		}
+		d.logger.Debug("SubmitMultiline result", "lines", lines)
+		resp.Cancelled = cancel
+		resp.TextValue = val
+	case v1.RequestType_REQUEST_TYPE_CHOICE:
+		selected, cancel, err := backend.SubmitChoice(ctx, request.AgentName, request.Title, request.Prompt, request.Choices, request.MultiSelect)
+		if err != nil {
+			d.logger.Warn("failed: SubmitChoice", "err", err)
+			return nil, errors.New("submission failed")
+		}
+		resp.Cancelled = cancel
+		resp.ChoiceValues = selected
+	case v1.RequestType_REQUEST_TYPE_UNSPECIFIED:
+		d.logger.Warn("received an unexpected request type",
+			"agent", request.AgentName,
+			"prompt", request.Prompt,
+		)
+	}
+
+	return resp, nil
 }
 
 // withCORS adds CORS support to a Connect HTTP handler.
