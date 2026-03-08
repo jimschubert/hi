@@ -23,7 +23,9 @@ func (d *Daemon) serveMCP(_ context.Context) error {
 		Version: daemonVersion,
 	}, &mcp.ServerOptions{Logger: d.logger})
 
-	registerTools(mcpServer, RandomResponseBackend{})
+	registerToolsAsync(mcpServer, d.queue, func(title, body string) {
+		d.notifyFn(title, body)
+	})
 
 	mux := http.NewServeMux()
 
@@ -43,7 +45,7 @@ func (d *Daemon) serveMCP(_ context.Context) error {
 		}
 
 		writer.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(writer).Encode(status)
+		_ = json.NewEncoder(writer).Encode(status)
 	})
 
 	// listen _first_ so we don't fail in goroutine
@@ -70,6 +72,11 @@ func (d *Daemon) serveMCP(_ context.Context) error {
 	})
 
 	return nil
+}
+
+func registerToolsAsync(server *mcp.Server, q *Queue, notifyFn func(title, body string)) {
+	backend := NewQueueBackend(q, notifyFn)
+	registerTools(server, backend)
 }
 
 func registerTools(server *mcp.Server, backend RequestBackend) {

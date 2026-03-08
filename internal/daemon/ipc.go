@@ -3,9 +3,9 @@ package daemon
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
-	"strings"
 	"time"
 
 	"connectrpc.com/connect"
@@ -85,61 +85,30 @@ func (d *Daemon) Shutdown(ctx context.Context, request *v1.ShutdownRequest) (*v1
 }
 
 func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestRequest) (*v1.SubmitRequestResponse, error) {
-	// TODO: Implement values. need to enqueue, respond, then return values here.
-	backend := RandomResponseBackend{}
+	d.notifyFn(request.Title, "Agent is awaiting your response.")
 
-	resp := &v1.SubmitRequestResponse{
-		TextValue:    "",
-		BoolValue:    false,
-		ChoiceValues: []string{},
-		Cancelled:    false,
+	// NOTE: this file is daemon/ipc.go, which is the right place (every time I look at it, I think it's wrong).
+	// This is the daemon's IPC handler, so we need to add any incoming request to the queue so the user
+	// can provide feedback. Enqueue internally waits for the result, so we can just return it directly here.
+	resp, err := d.queue.Enqueue(ctx, &PendingRequest{
+		Type:        protoToRequestType(request.Type),
+		AgentName:   request.AgentName,
+		Title:       request.Title,
+		Prompt:      request.Prompt,
+		DefaultVal:  request.DefaultVal,
+		Choices:     request.Choices,
+		MultiSelect: request.MultiSelect,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("context cancelled: %w", err)
 	}
 
-	switch request.Type {
-	case v1.RequestType_REQUEST_TYPE_CONFIRM:
-		confirm, cancel, err := backend.SubmitConfirm(ctx, request.AgentName, request.Title, request.Prompt)
-		if err != nil {
-			d.logger.Warn("failed: SubmitConfirm", "err", err)
-			return nil, errors.New("submission failed")
-		}
-		d.logger.Debug("SubmitConfirm result", "val", confirm)
-		resp.BoolValue = confirm
-		resp.Cancelled = cancel
-	case v1.RequestType_REQUEST_TYPE_TEXT:
-		val, cancel, err := backend.SubmitText(ctx, request.AgentName, request.Title, request.Prompt, request.DefaultVal)
-		if err != nil {
-			d.logger.Warn("failed: SubmitText", "err", err)
-			return nil, errors.New("submission failed")
-		}
-		d.logger.Debug("SubmitText result", "text", truncateText(val, 15))
-		resp.Cancelled = cancel
-		resp.TextValue = val
-	case v1.RequestType_REQUEST_TYPE_MULTILINE:
-		val, lines, cancel, err := backend.SubmitMultiline(ctx, request.AgentName, request.Title, request.Prompt, request.DefaultVal)
-		if err != nil {
-			d.logger.Warn("failed: SubmitMultiline", "err", err)
-			return nil, errors.New("submission failed")
-		}
-		d.logger.Debug("SubmitMultiline result", "lines", lines)
-		resp.Cancelled = cancel
-		resp.TextValue = val
-	case v1.RequestType_REQUEST_TYPE_CHOICE:
-		selected, cancel, err := backend.SubmitChoice(ctx, request.AgentName, request.Title, request.Prompt, request.Choices, request.MultiSelect)
-		if err != nil {
-			d.logger.Warn("failed: SubmitChoice", "err", err)
-			return nil, errors.New("submission failed")
-		}
-		d.logger.Debug("SubmitChoice result", "values", selected)
-		resp.Cancelled = cancel
-		resp.ChoiceValues = selected
-	case v1.RequestType_REQUEST_TYPE_UNSPECIFIED:
-		d.logger.Warn("received an unexpected request type",
-			"agent", request.AgentName,
-			"prompt", request.Prompt,
-		)
-	}
-
-	return resp, nil
+	return &v1.SubmitRequestResponse{
+		TextValue:    resp.TextValue,
+		BoolValue:    resp.BoolValue,
+		ChoiceValues: resp.ChoiceValues,
+		Cancelled:    resp.Cancelled,
+	}, nil
 }
 
 // withCORS adds CORS support to a Connect HTTP handler.
@@ -154,16 +123,19 @@ func withCORS(h http.Handler) http.Handler {
 	return middleware.Handler(h)
 }
 
-// Taken from https://stackoverflow.com/a/59955447
-// Adrian (https://stackoverflow.com/users/7426/adrian)
-// License: CC BY-SA 4.0
-func truncateText(s string, max int) string {
-	if max > len(s) {
-		return s
+func protoToRequestType(t v1.RequestType) RequestType {
+	switch t {
+	case v1.RequestType_REQUEST_TYPE_TEXT:
+		return RequestTypeText
+	case v1.RequestType_REQUEST_TYPE_MULTILINE:
+		return RequestTypeMultiline
+	case v1.RequestType_REQUEST_TYPE_CHOICE:
+		return RequestTypeChoice
+	case v1.RequestType_REQUEST_TYPE_CONFIRM:
+		return RequestTypeConfirm
+	case v1.RequestType_REQUEST_TYPE_NOTIFY:
+		return RequestTypeNotify
+	default:
+		return RequestTypeText
 	}
-	result := s[:strings.LastIndexAny(s[:max], " .,:;-")]
-	if len(result) != len(s) {
-		result += "..."
-	}
-	return result
 }

@@ -30,6 +30,10 @@ type Daemon struct {
 	config config.Config
 	logger *slog.Logger
 
+	ui       *uiState
+	queue    *Queue
+	notifyFn func(title, body string)
+
 	startedAt time.Time
 
 	shutdownHooks []func()
@@ -54,6 +58,8 @@ func New(mcpAddr string, opts ...Option) *Daemon {
 			},
 		)),
 		shutdownHooks: make([]func(), 0),
+		queue:         NewQueue(),
+		notifyFn:      func(_, _ string) {},
 	}
 }
 
@@ -105,8 +111,15 @@ func (d *Daemon) Start(ctx context.Context) error {
 		return err
 	}
 
-	// block until interrupt or ctx.Done(); calls shutdown hooks
-	_ = d.handleSignals(ctx)
+	go func() {
+		err := d.handleSignals(ctx)
+		if err != nil {
+			d.logger.Error("handle signals returned error", "error", err)
+		}
+	}()
+
+	// Fyne UI (blocks main thread until quit)
+	d.runUI(ctx)
 
 	d.logger.Info("hi daemon stopped", "uptime", time.Since(d.startedAt).String())
 	return nil
