@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"github.com/jimschubert/hi/internal/daemon/store"
 	v1 "github.com/jimschubert/hi/internal/proto/gen/hi/v1"
 )
 
@@ -104,18 +105,18 @@ func (b *IPCBackend) SubmitNotify(ctx context.Context, agentName, title, message
 }
 
 type QueueBackend struct {
-	queue    *Queue
+	queue    *store.Queue
 	notifyFn func(title, body string)
 }
 
-func NewQueueBackend(q *Queue, notifyFn func(title, body string)) *QueueBackend {
+func NewQueueBackend(q *store.Queue, notifyFn func(title, body string)) *QueueBackend {
 	return &QueueBackend{queue: q, notifyFn: notifyFn}
 }
 
 func (b *QueueBackend) SubmitText(ctx context.Context, agentName, title, prompt, defaultVal string) (string, bool, error) {
 	b.notifyFn(agentName+" is waiting", "Respond in the dialog that just appeared.")
-	resp, err := b.queue.Enqueue(ctx, &PendingRequest{
-		Type:       RequestTypeText,
+	resp, err := b.queue.Enqueue(ctx, &store.PendingRequest{
+		Type:       store.RequestTypeText,
 		AgentName:  agentName,
 		Title:      title,
 		Prompt:     prompt,
@@ -129,8 +130,8 @@ func (b *QueueBackend) SubmitText(ctx context.Context, agentName, title, prompt,
 
 func (b *QueueBackend) SubmitMultiline(ctx context.Context, agentName, title, prompt, defaultVal string) (string, int, bool, error) {
 	b.notifyFn(agentName+" is waiting", "Respond in the dialog that just appeared.")
-	resp, err := b.queue.Enqueue(ctx, &PendingRequest{
-		Type:       RequestTypeMultiline,
+	resp, err := b.queue.Enqueue(ctx, &store.PendingRequest{
+		Type:       store.RequestTypeMultiline,
 		AgentName:  agentName,
 		Title:      title,
 		Prompt:     prompt,
@@ -145,8 +146,8 @@ func (b *QueueBackend) SubmitMultiline(ctx context.Context, agentName, title, pr
 
 func (b *QueueBackend) SubmitChoice(ctx context.Context, agentName, title, prompt string, choices []string, multiSelect bool) ([]string, bool, error) {
 	b.notifyFn(agentName+" is waiting", "Respond in the dialog that just appeared.")
-	resp, err := b.queue.Enqueue(ctx, &PendingRequest{
-		Type:        RequestTypeChoice,
+	resp, err := b.queue.Enqueue(ctx, &store.PendingRequest{
+		Type:        store.RequestTypeChoice,
 		AgentName:   agentName,
 		Title:       title,
 		Prompt:      prompt,
@@ -161,8 +162,8 @@ func (b *QueueBackend) SubmitChoice(ctx context.Context, agentName, title, promp
 
 func (b *QueueBackend) SubmitConfirm(ctx context.Context, agentName, title, message string) (bool, bool, error) {
 	b.notifyFn(agentName+" needs confirmation", "Respond in the dialog that just appeared.")
-	resp, err := b.queue.Enqueue(ctx, &PendingRequest{
-		Type:      RequestTypeConfirm,
+	resp, err := b.queue.Enqueue(ctx, &store.PendingRequest{
+		Type:      store.RequestTypeConfirm,
 		AgentName: agentName,
 		Title:     title,
 		Prompt:    message,

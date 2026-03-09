@@ -1,4 +1,4 @@
-package daemon
+package ui
 
 import (
 	"image/color"

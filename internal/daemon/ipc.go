@@ -12,6 +12,7 @@ import (
 	connectcors "connectrpc.com/cors"
 	"connectrpc.com/grpcreflect"
 	"connectrpc.com/validate"
+	"github.com/jimschubert/hi/internal/daemon/store"
 	v1 "github.com/jimschubert/hi/internal/proto/gen/hi/v1"
 	"github.com/jimschubert/hi/internal/proto/gen/hi/v1/v1connect"
 	"github.com/rs/cors"
@@ -90,7 +91,7 @@ func (d *Daemon) SubmitRequest(ctx context.Context, request *v1.SubmitRequestReq
 	// NOTE: this file is daemon/ipc.go, which is the right place (every time I look at it, I think it's wrong).
 	// This is the daemon's IPC handler, so we need to add any incoming request to the queue so the user
 	// can provide feedback. Enqueue internally waits for the result, so we can just return it directly here.
-	resp, err := d.queue.Enqueue(ctx, &PendingRequest{
+	resp, err := d.queue.Enqueue(ctx, &store.PendingRequest{
 		Type:        protoToRequestType(request.Type),
 		AgentName:   request.AgentName,
 		Title:       request.Title,
@@ -123,19 +124,19 @@ func withCORS(h http.Handler) http.Handler {
 	return middleware.Handler(h)
 }
 
-func protoToRequestType(t v1.RequestType) RequestType {
+func protoToRequestType(t v1.RequestType) store.RequestType {
 	switch t {
 	case v1.RequestType_REQUEST_TYPE_TEXT:
-		return RequestTypeText
+		return store.RequestTypeText
 	case v1.RequestType_REQUEST_TYPE_MULTILINE:
-		return RequestTypeMultiline
+		return store.RequestTypeMultiline
 	case v1.RequestType_REQUEST_TYPE_CHOICE:
-		return RequestTypeChoice
+		return store.RequestTypeChoice
 	case v1.RequestType_REQUEST_TYPE_CONFIRM:
-		return RequestTypeConfirm
+		return store.RequestTypeConfirm
 	case v1.RequestType_REQUEST_TYPE_NOTIFY:
-		return RequestTypeNotify
+		return store.RequestTypeNotify
 	default:
-		return RequestTypeText
+		return store.RequestTypeText
 	}
 }

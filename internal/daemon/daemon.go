@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jimschubert/hi/internal/config"
+	"github.com/jimschubert/hi/internal/daemon/store"
+	"github.com/jimschubert/hi/internal/daemon/ui"
 )
 
 var (
@@ -30,8 +32,9 @@ type Daemon struct {
 	config config.Config
 	logger *slog.Logger
 
-	ui       *uiState
-	queue    *Queue
+	app *ui.Hi
+
+	queue    *store.Queue
 	notifyFn func(title, body string)
 
 	startedAt time.Time
@@ -58,7 +61,7 @@ func New(mcpAddr string, opts ...Option) *Daemon {
 			},
 		)),
 		shutdownHooks: make([]func(), 0),
-		queue:         NewQueue(),
+		queue:         store.NewQueue(),
 		notifyFn:      func(_, _ string) {},
 	}
 }
@@ -94,6 +97,8 @@ func (d *Daemon) Start(ctx context.Context) error {
 	}
 
 	d.logger.Info("hi daemon started", "addr", cmp.Or(d.mcpAddr, "<empty>"))
+	ctx = config.StoreMcpAddress(ctx, d.mcpAddr)
+	ctx = config.StoreDaemonVersion(ctx, daemonVersion)
 
 	ctx, cancel := context.WithCancel(ctx)
 	d.cancel = cancel
@@ -118,8 +123,12 @@ func (d *Daemon) Start(ctx context.Context) error {
 		}
 	}()
 
+	d.app = ui.NewHi(ctx, d.queue)
+
+	d.notifyFn = d.app.Notify
+
 	// Fyne UI (blocks main thread until quit)
-	d.runUI(ctx)
+	d.app.Run()
 
 	d.logger.Info("hi daemon stopped", "uptime", time.Since(d.startedAt).String())
 	return nil

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/jimschubert/hi/internal/daemon/store"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -74,7 +75,7 @@ func (d *Daemon) serveMCP(_ context.Context) error {
 	return nil
 }
 
-func registerToolsAsync(server *mcp.Server, q *Queue, notifyFn func(title, body string)) {
+func registerToolsAsync(server *mcp.Server, q *store.Queue, notifyFn func(title, body string)) {
 	backend := NewQueueBackend(q, notifyFn)
 	registerTools(server, backend)
 }
