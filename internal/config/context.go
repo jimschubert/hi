@@ -2,10 +2,8 @@ package config
 
 import "context"
 
-const (
-	mcpAddress    = "mcpAddress"
-	daemonVersion = "daemonVersion"
-)
+var daemonKey = configCtxKey{name: "daemonVersion"}
+var mcpAddrKey = configCtxKey{name: "mcpAddress"}
 
 // configCtxKey stores individual values on context
 // TODO: consider maybe storing everything in *Config and setting that on context?
@@ -14,12 +12,12 @@ type configCtxKey struct {
 }
 
 func StoreMcpAddress(ctx context.Context, addr string) context.Context {
-	ctx = context.WithValue(ctx, configCtxKey{name: mcpAddress}, addr)
+	ctx = context.WithValue(ctx, mcpAddrKey, addr)
 	return ctx
 }
 
 func GetMcpAddress(ctx context.Context) string {
-	if v := ctx.Value(configCtxKey{mcpAddress}); v != nil {
+	if v := ctx.Value(mcpAddrKey); v != nil {
 		if value, ok := v.(string); ok {
 			return value
 		}
@@ -28,12 +26,12 @@ func GetMcpAddress(ctx context.Context) string {
 }
 
 func StoreDaemonVersion(ctx context.Context, version string) context.Context {
-	ctx = context.WithValue(ctx, configCtxKey{name: daemonVersion}, version)
+	ctx = context.WithValue(ctx, daemonKey, version)
 	return ctx
 }
 
 func GetDaemonVersion(ctx context.Context) string {
-	if v := ctx.Value(configCtxKey{daemonVersion}); v != nil {
+	if v := ctx.Value(daemonKey); v != nil {
 		if value, ok := v.(string); ok {
 			return value
 		}
