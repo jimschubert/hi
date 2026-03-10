@@ -8,10 +8,11 @@
 
 > A single notification system for every agent.
 
-`hi` ("human intelligence") is a persistent desktop daemon which provides AI agents (Claude, Qwen, Copilot, and non-alliterative others) a single point of human interaction.
+`hi` ("human intelligence") is a work-in-progress persistent desktop daemon which provides AI agents (Claude, Qwen, Copilot, and non-alliterative others) a single point of human interaction.
 As an MCP server, this avoids ending a session where possible which _might_ save you credits/requests.
 
 Here's how it works.
+
 1. Any agent can send a `hi_*` request to the `hi` daemon
 2. The daemon will display a notification to the user that the agent is awaiting human input
 3. The human (you) clicks on the "Show next request" in your system tray
@@ -94,6 +95,18 @@ Assuming you've already started `hi daemon` with `--addr localhost:45678`:
     }
   }
 }
+```
+
+## Example Prompt
+
+Here's an example system prompt to ask your LLM to use `hi`:
+
+```
+When you need user input, decisions, or confirmations, use the human-intelligence MCP server tools
+(get_user_input, get_user_choice, show_confirmation_dialog, etc.)
+instead of asking me in chat.
+
+This keeps our conversation clean and provides better interaction.
 ```
 
 ## License
