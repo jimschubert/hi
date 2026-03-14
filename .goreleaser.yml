@@ -1,5 +1,8 @@
-# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
-# single build: goreleaser build --clean --snapshot --id hi --single-target
+# yaml-language-server: $schema=https://goreleaser.com/static/schema-pro.json
+# I keep both goreleaser and goleleaser-pro binaries, e.g:
+# ln -sf /opt/homebrew/Caskroom/goreleaser-pro/2.14.3/goreleaser /opt/homebrew/bin/goreleaser-pro
+# Useful commands:
+#   goreleaser-pro build --clean --snapshot --id hi-darwin-arm64 --single-target
 version: 2
 before:
   hooks:
@@ -7,23 +10,59 @@ before:
     - go mod download
     - sh -c 'cd internal/proto && buf generate'
     - go fix ./...
+
+env:
+  - CGO_ENABLED=1
+
 builds:
-  - id: hi
+  - id: hi-linux-amd64
     main: ./cmd/hi
     binary: hi
     env:
-      - CGO_ENABLED=1
+      - CC=gcc
+      - CXX=g++
     ldflags:
       - -s -w
-      - -X main.version={{ .Version }}
-      - -X main.commit={{ .ShortCommit }}
-      - -X github.com/jimschubert/hi/internal/daemon.daemonVersion={{ .Version }}
+      - -X main.programName={{.ProjectName}}
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
     goos:
       - linux
-      - darwin
     goarch:
       - amd64
+
+  - id: hi-linux-arm64
+    main: ./cmd/hi
+    binary: hi
+    env:
+      - CC=gcc
+      - CXX=g++
+    ldflags:
+      - -s -w
+      - -X main.programName={{.ProjectName}}
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+    goos:
+      - linux
+    goarch:
       - arm64
+
+  - id: hi-darwin-arm64
+    main: ./cmd/hi
+    binary: hi
+    env:
+      - CC=clang
+      - CXX=clang++
+    ldflags:
+      - -s -w
+      - -X main.programName={{.ProjectName}}
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+    goos:
+      - darwin
+    goarch:
+      - arm64
+
 archives:
   - formats:
       - tar.gz
@@ -65,3 +104,10 @@ docker_digest:
 #      "org.opencontainers.image.licenses": "Apache-2.0"
 #    build_args:
 #      APP_NAME: "{{ .ProjectName }}"
+
+# Goreleaser Pro Configs below
+git:
+  tag_sort: semver
+
+partial:
+  by: target

@@ -1,4 +1,4 @@
-# Copyright 2020-2026 Jim Schubert
+# Copyright 2026 Jim Schubert
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,18 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-# Build workflow: Builds and releases the Go application using GoReleaser.
-# Triggers on pushes to main/master branches and version tags (v*).
-# Creates GitHub releases and pushes Docker images for tagged versions.
-
-name: Build Go
+name: Go Build and Publish
 on:
   push:
-    branches: [ 'main' ]
+    branches: ["main"]
     # Don't want v1 to be triggered when promoting v1.*.*, because it will fail as artifacts already exist.
     # This works because v1.*.* also pushes the v1 docker image tag.
-    tags: [ 'v[0-9]+.[0-9]+.[0-9]+' ]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
   contents: write
@@ -33,12 +28,262 @@ permissions:
   artifact-metadata: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-go-build-goreleaser
   cancel-in-progress: true
 
 jobs:
-  build:
-    uses: jimschubert/.workflows/.github/workflows/go-build-goreleaser.yml@main
-    with:
-      golangci-lint-version: 'v2.9.0'
-    secrets: inherit
+  lint:
+    name: Lint with golangci
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Linux Dependencies when needed
+        uses: ./.github/actions/setup-fyne-linux
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.9.0
+          args: --timeout 5m
+
+
+  # see https://carlosbecker.com/posts/goreleaser-split-merge/
+  prepare:
+    needs: lint
+    if: needs.lint.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    name: Prepare Goreleaser Build (Split)
+    strategy:
+      matrix:
+        include:
+          - GOOS: linux
+            GOARCH: amd64
+            os: ubuntu-latest
+          - GOOS: linux
+            GOARCH: arm64
+            os: ubuntu-24.04-arm
+          - GOOS: darwin
+            GOARCH: arm64
+            os: macos-14
+    timeout-minutes: 20
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      # goreleaser continue does not support --snapshot, so set it during the split phase.
+      - if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+        run: echo "flags=--snapshot" >> $GITHUB_ENV
+
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          check-latest: true
+
+      - name: Install Linux Dependencies when needed
+        if: matrix.GOOS == 'linux'
+        uses: ./.github/actions/setup-fyne-linux
+
+      - shell: bash
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - id: cache
+        uses: actions/cache@v5
+        with:
+          path: dist/${{ matrix.GOOS }}-${{ matrix.GOARCH }}
+          key: ${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ env.sha_short }}
+
+      - uses: anchore/sbom-action/download-syft@v0.22.1
+
+      - name: Test
+        run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Upload coverage
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v6
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 3
+
+      - uses: goreleaser/goreleaser-action@v7
+        if: steps.cache.outputs.cache-hit != 'true'
+        with:
+          distribution: goreleaser-pro
+          version: latest
+          args: release --clean --split ${{ env.flags }}
+        env:
+          GGOOS: ${{ matrix.GOOS }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+
+  publish:
+    needs: prepare
+    if: needs.prepare.result == 'success' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    name: Publish Goreleaser Build (Combine)
+    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          check-latest: true
+
+      - name: Check for Docker Environment
+        shell: bash
+        id: has-docker
+        env:
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [ ! -z "${DOCKER_PASSWORD}" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "✅ Docker credentials are available"
+            exit 0
+          fi
+
+      - name: Set up QEMU
+        if: >-
+          success() && startsWith(github.ref, 'refs/tags/v') && 
+          steps.has-docker.outputs.available == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        id: buildx
+        if: >-
+          success() && startsWith(github.ref, 'refs/tags/v') && 
+          steps.has-docker.outputs.available == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        if: >-
+          success() && startsWith(github.ref, 'refs/tags/v') && 
+          steps.has-docker.outputs.available == 'true'
+        uses: docker/login-action@v3.7.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # copy the cashes from prepare
+      - shell: bash
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+      - uses: actions/cache@v3
+        with:
+          path: dist/linux-amd64
+          key: linux-amd64-${{ env.sha_short }}
+      - uses: actions/cache@v3
+        with:
+          path: dist/linux-arm64
+          key: linux-arm64-${{ env.sha_short }}
+      - uses: actions/cache@v3
+        with:
+          path: dist/darwin-arm64
+          key: darwin-arm64-${{ env.sha_short }}
+
+      - uses: anchore/sbom-action/download-syft@v0.22.1
+
+      - name: GoReleaser
+        id: goreleaser
+        uses: goreleaser/goreleaser-action@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILDX_BUILDER: ${{ steps.buildx.outputs.name }}
+          GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
+        with:
+          distribution: goreleaser-pro
+          version: latest
+          args: continue --merge
+
+      - name: Extract Docker image info for attestation
+        id: docker-info
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          # Parse goreleaser artifacts to extract Docker image info
+          ARTIFACTS='${{ steps.goreleaser.outputs.artifacts }}'
+          
+          # Check if there are any Docker images
+          DOCKER_COUNT=$(echo "$ARTIFACTS" | jq '[.[] | select(.type == "Docker Image")] | length')
+          
+          if [ "$DOCKER_COUNT" -eq 0 ]; then
+            echo "No Docker images found in artifacts"
+            echo "has-docker=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Get unique image digests (all tags point to same digest)
+          DIGEST=$(echo "$ARTIFACTS" | jq -r '[.[] | select(.type == "Docker Image")] | .[0].extra.Digest // empty')
+          
+          # Get image name from first Docker image, strip the tag
+          FULL_IMAGE=$(echo "$ARTIFACTS" | jq -r '[.[] | select(.type == "Docker Image")] | .[0].name // empty')
+          
+          if [ -z "$DIGEST" ] || [ -z "$FULL_IMAGE" ]; then
+            echo "Docker image or digest not found"
+            echo "has-docker=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Remove tag (everything after last colon)
+          IMAGE_NAME="${FULL_IMAGE%:*}"
+          
+          # If no registry (no slash before image name), prepend docker.io
+          if [[ "$IMAGE_NAME" != *"/"* ]]; then
+            IMAGE_NAME="docker.io/$IMAGE_NAME"
+          elif [[ "$IMAGE_NAME" != *"."* ]]; then
+            # Has slash but no dot in registry part = Docker Hub user/image
+            IMAGE_NAME="docker.io/$IMAGE_NAME"
+          fi
+          
+          echo "has-docker=true" >> $GITHUB_OUTPUT
+          echo "image-name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "digest=$DIGEST" >> $GITHUB_OUTPUT
+          echo "Docker image for attestation: $IMAGE_NAME@$DIGEST"
+
+      - name: Attest Docker Image(s) via checksums
+        uses: actions/attest-build-provenance@v3.2.0
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') && 
+          steps.docker-info.outputs.has-docker == 'true' &&
+          hashFiles('dist/digests.txt') != ''
+        with:
+          subject-name: ${{ steps.docker-info.outputs.image-name }}
+          subject-checksums: dist/digests.txt
+          push-to-registry: true
+
+      - name: Attest Docker Image(s) via digest
+        uses: actions/attest-build-provenance@v3.2.0
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') &&
+          steps.docker-info.outputs.has-docker == 'true' &&
+          hashFiles('dist/digests.txt') == '' &&
+          steps.docker-info.outputs.digest != ''
+        with:
+          subject-name: ${{ steps.docker-info.outputs.image-name }}
+          subject-digest: ${{ steps.docker-info.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Artifact(s)
+        uses: actions/attest-build-provenance@v3.2.0
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') && 
+          hashFiles('dist/checksums.txt') != ''
+        with:
+          subject-checksums: dist/checksums.txt
