@@ -120,14 +120,16 @@ jobs:
           retention-days: 3
 
       - uses: goreleaser/goreleaser-action@v7
-        if: steps.cache.outputs.cache-hit != 'true'
         with:
           distribution: goreleaser-pro
           version: latest
           args: release --clean --split ${{ env.flags }}
         env:
+          # NOTE: GGOOS is used by goreleaser-pro to filter only which targets are built, nothing else
           GGOOS: ${{ matrix.GOOS }}
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
+          # NOTE: GGOARCH is used by goreleaser-pro to filter only which targets are built, nothing else
+          GGOARCH: ${{ matrix.GOARCH }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GORELEASER_KEY: ${{ secrets.GORELEASER_KEY }}
 
   publish:
@@ -186,15 +188,21 @@ jobs:
       # copy the cashes from prepare
       - shell: bash
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-      - uses: actions/cache@v3
+
+      - name: Restore linux_amd64 artifacts
+        uses: actions/cache@v3
         with:
           path: dist/linux_amd64
           key: linux-amd64-${{ env.sha_short }}
-      - uses: actions/cache@v3
+
+      - name: Restore linux_arm64 artifacts
+        uses: actions/cache@v3
         with:
           path: dist/linux_arm64
           key: linux-arm64-${{ env.sha_short }}
-      - uses: actions/cache@v3
+
+      - name: Restore darwin_arm64 artifacts
+        uses: actions/cache@v3
         with:
           path: dist/darwin_arm64
           key: darwin-arm64-${{ env.sha_short }}
