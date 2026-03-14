@@ -103,7 +103,7 @@ jobs:
       - id: cache
         uses: actions/cache@v5
         with:
-          path: dist/${{ matrix.GOOS }}-${{ matrix.GOARCH }}
+          path: dist/${{ matrix.GOOS }}_${{ matrix.GOARCH }}
           key: ${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ env.sha_short }}
 
       - uses: anchore/sbom-action/download-syft@v0.22.1
@@ -188,15 +188,15 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
       - uses: actions/cache@v3
         with:
-          path: dist/linux-amd64
+          path: dist/linux_amd64
           key: linux-amd64-${{ env.sha_short }}
       - uses: actions/cache@v3
         with:
-          path: dist/linux-arm64
+          path: dist/linux_arm64
           key: linux-arm64-${{ env.sha_short }}
       - uses: actions/cache@v3
         with:
-          path: dist/darwin-arm64
+          path: dist/darwin_arm64
           key: darwin-arm64-${{ env.sha_short }}
 
       - uses: anchore/sbom-action/download-syft@v0.22.1
