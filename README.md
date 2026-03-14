@@ -34,7 +34,7 @@ for details on responsible agentic AI.
 ## Install
 
 ```shell
-go install github.com/jimschubert/hi@latest
+go install github.com/jimschubert/hi/cmd/hi@latest
 ```
 
 ## Usage
