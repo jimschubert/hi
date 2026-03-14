@@ -211,7 +211,7 @@ jobs:
         with:
           distribution: goreleaser-pro
           version: latest
-          args: continue --merge
+          args: release continue --merge
 
       - name: Extract Docker image info for attestation
         id: docker-info
