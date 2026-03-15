@@ -370,7 +370,7 @@ jobs:
       - name: Update release notes
         if: >-
           startsWith(github.ref, 'refs/tags/v') &&
-          hashFiles('${{ github.workspace }}/.github/CHANGELOG.md') != ''
+          hashFiles('.github/CHANGELOG.md') != ''
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           gh release edit "$TAG" --notes-file ${{ github.workspace }}/.github/CHANGELOG.md
