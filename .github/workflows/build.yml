@@ -87,18 +87,80 @@ jobs:
         with:
           fetch-depth: 0
 
+      - shell: bash
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
           check-latest: true
 
+
+      - name: Check for Changelog Config
+        id: changelog-config
+        run: |
+          if [ -f "${{ github.workspace }}/.github/CHANGELOG.md" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "✅ Changelog file exists at ${{ github.workspace }}/.github/CHANGELOG.md"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Find Last Tag
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') &&
+          steps.changelog-config.outputs.exists == 'true'
+        id: last
+        uses: jimschubert/query-tag-action@v2
+        with:
+          include: 'v*'
+          exclude: '*-rc*'
+          commit-ish: 'HEAD~'
+          skip-unshallow: 'true'
+
+      - name: Find Current Tag
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') &&
+          steps.changelog-config.outputs.exists == 'true'
+        id: current
+        uses: jimschubert/query-tag-action@v2
+        with:
+          include: 'v*'
+          exclude: '*-rc*'
+          commit-ish: '@'
+          skip-unshallow: 'true'
+
+      - name: Create Changelog
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') && 
+          steps.changelog-config.outputs.exists == 'true'
+        id: changelog
+        uses: jimschubert/beast-changelog-action@v1
+        with:
+          CONFIG_LOCATION: .github/CHANGELOG.md
+          FROM: ${{ steps.last.outputs.tag }}
+          TO: ${{ steps.current.outputs.tag }}
+
+      - name: Set Release Notes Flag
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') && 
+          steps.changelog-config.outputs.exists == 'true'
+        run: echo "release_notes=--release-notes=${{ github.workspace }}/.github/CHANGELOG.md" >> $GITHUB_ENV
+
+      - name: Cache generated changelog
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') &&
+          steps.changelog-config.outputs.exists == 'true'
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.github/CHANGELOG.md
+          key: changelog-${{ env.sha_short }}
+
       - name: Install Linux Dependencies when needed
         if: matrix.GOOS == 'linux'
         uses: ./.github/actions/setup-fyne-linux
 
-      - shell: bash
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - id: cache
         uses: actions/cache@v5
@@ -123,7 +185,7 @@ jobs:
         with:
           distribution: goreleaser-pro
           version: latest
-          args: release --clean --split ${{ env.flags }}
+          args: release --clean --split ${{ env.flags }} ${{ env.release_notes }}
         env:
           # NOTE: GGOOS is used by goreleaser-pro to filter only which targets are built, nothing else
           GGOOS: ${{ matrix.GOOS }}
@@ -190,19 +252,19 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Restore linux_amd64 artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: dist/linux_amd64
           key: linux-amd64-${{ env.sha_short }}
 
       - name: Restore linux_arm64 artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: dist/linux_arm64
           key: linux-arm64-${{ env.sha_short }}
 
       - name: Restore darwin_arm64 artifacts
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: dist/darwin_arm64
           key: darwin-arm64-${{ env.sha_short }}
@@ -295,3 +357,22 @@ jobs:
           hashFiles('dist/checksums.txt') != ''
         with:
           subject-checksums: dist/checksums.txt
+
+      - name: Restore generated changelog
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/cache@v5
+        with:
+          path: ${{ github.workspace }}/.github/CHANGELOG.md
+          key: changelog-${{ env.sha_short }}
+
+      # Update release notes (goreleaser continue doesn't support --release-notes)
+      # Approach copied from roelfdiedericks/goclaw
+      - name: Update release notes
+        if: >-
+          startsWith(github.ref, 'refs/tags/v') &&
+          hashFiles('${{ github.workspace }}/.github/CHANGELOG.md') != ''
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          gh release edit "$TAG" --notes-file ${{ github.workspace }}/.github/CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
