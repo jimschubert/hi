@@ -168,7 +168,7 @@ jobs:
           path: dist/${{ matrix.GOOS }}_${{ matrix.GOARCH }}
           key: ${{ matrix.GOOS }}-${{ matrix.GOARCH }}-${{ env.sha_short }}
 
-      - uses: anchore/sbom-action/download-syft@v0.22.1
+      - uses: anchore/sbom-action/download-syft@v0.23.1
 
       - name: Test
         run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
@@ -269,7 +269,7 @@ jobs:
           path: dist/darwin_arm64
           key: darwin-arm64-${{ env.sha_short }}
 
-      - uses: anchore/sbom-action/download-syft@v0.22.1
+      - uses: anchore/sbom-action/download-syft@v0.23.1
 
       - name: GoReleaser
         id: goreleaser
