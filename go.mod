@@ -17,7 +17,7 @@ require (
 	connectrpc.com/grpcreflect v1.3.0
 	connectrpc.com/validate v0.6.0
 	fyne.io/fyne/v2 v2.7.3
-	github.com/alecthomas/kong v1.14.0
+	github.com/alecthomas/kong v1.15.0
 	github.com/google/uuid v1.6.0
 	github.com/lithammer/dedent v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.4.0
