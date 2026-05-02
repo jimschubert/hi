@@ -236,7 +236,7 @@ jobs:
         if: >-
           success() && startsWith(github.ref, 'refs/tags/v') && 
           steps.has-docker.outputs.available == 'true'
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Login to Docker Hub
         if: >-
