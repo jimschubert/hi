@@ -328,7 +328,7 @@ jobs:
           echo "Docker image for attestation: $IMAGE_NAME@$DIGEST"
 
       - name: Attest Docker Image(s) via checksums
-        uses: actions/attest-build-provenance@v4.1.0
+        uses: actions/attest-build-provenance@v4.1.1
         if: >-
           startsWith(github.ref, 'refs/tags/v') && 
           steps.docker-info.outputs.has-docker == 'true' &&
@@ -339,7 +339,7 @@ jobs:
           push-to-registry: true
 
       - name: Attest Docker Image(s) via digest
-        uses: actions/attest-build-provenance@v4.1.0
+        uses: actions/attest-build-provenance@v4.1.1
         if: >-
           startsWith(github.ref, 'refs/tags/v') &&
           steps.docker-info.outputs.has-docker == 'true' &&
@@ -351,7 +351,7 @@ jobs:
           push-to-registry: true
 
       - name: Attest Artifact(s)
-        uses: actions/attest-build-provenance@v4.1.0
+        uses: actions/attest-build-provenance@v4.1.1
         if: >-
           startsWith(github.ref, 'refs/tags/v') && 
           hashFiles('dist/checksums.txt') != ''
