@@ -22,7 +22,7 @@ require (
 	github.com/lithammer/dedent v1.1.0
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/rs/cors v1.11.1
-	github.com/sethvargo/go-envconfig v1.3.0
+	github.com/sethvargo/go-envconfig v1.4.3
 	golang.org/x/net v0.56.0
 )
 
